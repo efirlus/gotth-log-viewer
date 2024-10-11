@@ -7,15 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"reflect"
 	"syscall"
 	"time"
 )
 
-// TODO: lg 모듈 각 모듈에 삽입하기
-//
-//	stacktrace 되니까 다 log하지 말고 받아넣기
-//
 // 앞으로도 존나 복사해다가 쓸 fsnotify watcher
 // 주요 기능
 //  1. 강제 종료도 로깅 가능
@@ -56,15 +51,4 @@ func main() {
 	}
 
 	os.Exit(0)
-}
-
-func printStruct(s interface{}) {
-	v := reflect.ValueOf(s)
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		value := v.Field(i)
-		fmt.Printf("%s: %v\n", field.Name, value.Interface())
-	}
 }

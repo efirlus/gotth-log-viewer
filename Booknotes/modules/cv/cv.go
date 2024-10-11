@@ -1,17 +1,19 @@
 package cv
 
+// 모든 패키지에서 공통적으로 호출해야하는 것들 모아놓음
+
 import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
+// 각종 파일, 디렉토리 경로
 const (
 	MDdir    = "/home/efirlus/OneDrive/obsidian/Vault/6. Calibre"
 	CoverDir = "/home/efirlus/OneDrive/obsidian/Vault/images"
@@ -52,6 +54,8 @@ func YesNo(input interface{}) interface{} {
 
 // c-1. commentLinker replaces occurrences of [[some phrase]] with <a href=somelink>some phrase</a>
 func CommentLinker(comments string) (string, error) {
+	var err error
+	var link string
 	// Regex pattern to find [[some phrase]]
 	re := regexp.MustCompile(`\[\[([^\[\]]+)\]\]`)
 
@@ -60,13 +64,15 @@ func CommentLinker(comments string) (string, error) {
 		// Extract the phrase inside [[ ]]
 		phrase := re.FindStringSubmatch(match)[1]
 		// Generate the link
-		link, err := linkGenerator(phrase)
-		if err != nil {
-			return ""
-		}
+		link, err = linkGenerator(phrase)
+
 		// Return the replacement string
 		return fmt.Sprintf(`<a href="%s">%s</a>`, link, phrase)
 	})
+
+	if err != nil {
+		return "", fmt.Errorf("링크에 정규식 적용 실패: %v", err)
+	}
 
 	return result, nil
 }
@@ -82,7 +88,7 @@ func linkGenerator(phrase string) (string, error) {
 	case true:
 		id, err := grabIDofMD(filename)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("md파일 확인 실패: %v", err)
 		}
 		return fmt.Sprintf("calibre://book-details/_hex_-426f6f6b/%d", id), nil
 
@@ -91,7 +97,7 @@ func linkGenerator(phrase string) (string, error) {
 		return fmt.Sprintf("calibre://show-note/Book/authors/hex_%s", hexcode), nil
 	}
 
-	return "", fmt.Errorf("cannot generate address")
+	return "", fmt.Errorf("주소 생성 실패")
 }
 
 // c-2-1. 링크 생성을 위한 파일 확인
@@ -108,7 +114,7 @@ func grabIDofMD(filename string) (int, error) {
 
 	f, err := os.Open(filePath)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("md파일 열기 실패: %v", err)
 	}
 	defer f.Close()
 
@@ -120,48 +126,14 @@ func grabIDofMD(filename string) (int, error) {
 
 			id, err = strconv.Atoi(strings.TrimSpace(rawID))
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("id 숫자 추출 실패: %v", err)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("md파일 스캔 실패: %v", err)
 	}
 
 	return id, nil
-}
-
-func emptizer(vars ...interface{}) {
-	for _, v := range vars {
-		val := reflect.ValueOf(v)
-		if val.Kind() != reflect.Ptr {
-			fmt.Printf("Warning: Cannot empty non-pointer value of type %T\n", v)
-			continue
-		}
-		val = val.Elem() // Dereference the pointer
-		switch val.Kind() {
-		case reflect.String:
-			val.SetString("")
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			val.SetInt(0)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			val.SetUint(0)
-		case reflect.Float32, reflect.Float64:
-			val.SetFloat(0)
-		case reflect.Bool:
-			val.SetBool(false)
-		case reflect.Slice, reflect.Map:
-			val.Set(reflect.Zero(val.Type()))
-		case reflect.Struct:
-			for i := 0; i < val.NumField(); i++ {
-				field := val.Field(i)
-				if field.CanSet() {
-					field.Set(reflect.Zero(field.Type()))
-				}
-			}
-		default:
-			fmt.Printf("Warning: Unsupported type %T\n", v)
-		}
-	}
 }

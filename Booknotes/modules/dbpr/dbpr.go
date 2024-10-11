@@ -1,9 +1,17 @@
 package dbpr
 
+// db의 변화를 파악한 뒤에 가동할 실질적인 라이브러리
+// 일단 list -f로 목록을 받아서 directory와 비교한 후
+// 없는거 지우고, 새로 생긴거 만드는 과정을 2개로 엮음
+// 리스트 확인 - 지우기 한세트
+// 만들기 한세트
+// 나눈 이유는 ignoreUntil 때문
+
 import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -43,24 +51,24 @@ type BookMetadata struct {
 	Status      string
 }
 
-// First Handler
+// 1. 리스트 확인, 없어진 거 삭제
 func DBhandleFirst() map[int]string {
-	// 1. db 에서 리스트를 추출, 매핑
+	// a. db 에서 리스트를 추출, 매핑
 	cmd := commander.Listdb()
 	rawres, err := commander.CommandExec(cmd)
 	if err != nil {
 		lg.Err("cannot execute list -f command", err)
 	}
 	lines := strings.Split(strings.TrimSpace(rawres), "\n")
-	dbMap := ProcessEntries(lines)
+	dbMap := processEntries(lines)
 
-	// 2. 디렉토리 리스트 추출
-	mdList := GrabListofMD()
+	// b. 디렉토리 리스트 추출
+	mdList := grabListofMD()
 
-	// 3. 비교
+	// c. 비교
 	notInMD, notInDB := findMissingItems(dbMap, mdList)
 
-	// 4. 파일 삭제
+	// d. 파일 삭제
 	for _, title := range notInDB {
 		fullpath := filepath.Join(cv.MDdir, title+".md")
 		err := os.Remove(fullpath)
@@ -81,7 +89,7 @@ func DBhandleFirst() map[int]string {
 }
 
 // a. dblist를 매핑
-func ProcessEntries(lines []string) map[string]int {
+func processEntries(lines []string) map[string]int {
 	results := make(map[string]int)
 
 	for _, line := range lines {
@@ -114,8 +122,8 @@ func ProcessEntries(lines []string) map[string]int {
 	return results
 }
 
-// 2. directory list 생성
-func GrabListofMD() []string {
+// b. directory list 생성
+func grabListofMD() []string {
 	var dirList []string
 	files, err := os.ReadDir(cv.MDdir)
 	if err != nil {
@@ -132,7 +140,7 @@ func GrabListofMD() []string {
 	return dirList
 }
 
-// 3. 맵과 directory 리스트 비교
+// c. 맵과 directory 리스트 비교
 func findMissingItems(m map[string]int, slice []string) (map[int]string, []string) {
 	// Create a set from the slice for efficient lookup
 	sliceSet := make(map[string]bool)
@@ -156,11 +164,11 @@ func findMissingItems(m map[string]int, slice []string) (map[int]string, []strin
 		}
 	}
 
+	sliceSet = nil
 	return resultMap, missingStrings
 }
 
-// regex 버전, 이건 잘 작동하네 그냥 이거 쓸래
-// db의 데이터를 추출해 BookMetadata로 저장
+// 2. db의 데이터를 추출해 BookMetadata로 저장
 func ParseResult(resultString string) (BookMetadata, error) {
 	result := BookMetadata{}
 
@@ -191,6 +199,7 @@ func ParseResult(resultString string) (BookMetadata, error) {
 			}
 
 			// 키 별 스위치로 value 저장
+			var err error
 			switch key {
 			case "Title":
 				result.Title = value
@@ -205,22 +214,41 @@ func ParseResult(resultString string) (BookMetadata, error) {
 			case "Author(s)":
 				result.Authors = strings.Split(value, " [")[0]
 			case "화수":
-				fmt.Sscanf(value, "%d", &result.Chapter)
+				result.Chapter, err = strconv.Atoi(value)
+				if err != nil {
+					lg.Err("화수 읽기 실패", err)
+				}
 			case "PubDate":
 				result.PubDate = value
 			case "완결":
-				result.Completion = cv.YesNo(value).(bool)
+				completionValue := cv.YesNo(value)
+				if completionBool, ok := completionValue.(bool); ok {
+					result.Completion = completionBool
+				} else {
+					err = fmt.Errorf("완결 여부 확인 실패")
+				}
+				if err != nil {
+					lg.Err("화수 읽기 실패", err)
+				}
 			case "Rating":
-				fmt.Sscanf(value, "%d", &result.Rating)
+				result.Rating, err = strconv.Atoi(value)
+				if err != nil {
+					lg.Err("점수 읽기 실패", err)
+				}
 			case "Timestamp":
 				result.Timestamp = value
 			case "ID":
-				fmt.Sscanf(value, "%d", &result.ID)
+				result.ID, err = strconv.Atoi(value)
+				if err != nil {
+					lg.Err("아이디 읽기 실패", err)
+				}
 			case "Comments":
 				currentKey = "Comments"
 				commentsBuilder.WriteString(value + "\n")
 			case "상태":
 				result.Status = value
+			default:
+				lg.Err("unknown key", fmt.Errorf("%v", key))
 			}
 		} else if currentKey == "Comments" {
 			// 뭔진 몰라도 더 추가
@@ -235,61 +263,25 @@ func ParseResult(resultString string) (BookMetadata, error) {
 		result.Comments = strings.TrimSpace(commentsBuilder.String())
 	}
 
+	if result.Title == "" {
+		return result, errors.New("missing required field : title")
+	}
+
 	lines = nil
 	// 최종 결과
 	return result, nil
 }
 
-func CommentMarkdownizer(html string) (markdown string) {
-	// html -> markdown 주의점
-	//     [[]]를 링크로 처리 못하고 \[\[\]\]로 처리함
-	//     그러니까 미리 이걸 <a href> 처리하고 나서 돌려야 함
-	//     그 다음에 []() 형식으로 만들어진 링크들을 전부 [[]]로 변환
-
-	// a. <a href> linker
-	linked, err := cv.CommentLinker(html)
-	if err != nil {
-		lg.Err("임시 html 링크 생성 실패", err)
-	}
-
-	// b. 나머지 html 변환
-	converter := md.NewConverter("", true, nil)
-
-	tempmarkdown, err := converter.ConvertString(linked)
-	if err != nil {
-		lg.Err("마크다운 문법 생성 실패", err)
-	}
-
-	// c. []() 링크를 전부 [[]]로 재변환
-	markdown = ReverseCommentLinker(tempmarkdown)
-
-	linked = ""
-	converter = nil
-	tempmarkdown = ""
-	return markdown
-}
-
-// ReverseCommentLinker replaces <a href="...">some phrase</a> with [[some phrase]]
-func ReverseCommentLinker(comments string) string {
-	// Regex to match <a href="...">some phrase</a>
-	re := regexp.MustCompile(`\[(.+?)\]\(.+?\)`)
-
-	// Replace each occurrence with [[some phrase]]
-	result := re.ReplaceAllString(comments, `[[${1}]]`)
-
-	return result
-}
-
-// 특정 아이디를 받아 그 책의 메타데이타를 개별 문서로 만들어주는 함수
+// 3. 특정 아이디를 받아 그 책의 메타데이타를 개별 문서로 만들어주는 함수
 func GenerateMarkdown(result BookMetadata) (string, error) {
 
 	// Process the Authors field
 	authors := strings.Split(result.Authors, " [")[0]
 
-	// Copying Cover Inage
-	Cover, err := copyAndRenameCover(result.ID)
+	// Copying cover Inage
+	cover, err := copyAndRenameCover(result.ID)
 	if err != nil {
-		return "", fmt.Errorf("while copy the cover of a book: %v")
+		return "", fmt.Errorf("커버 파일 확보 실패: %v", err)
 	}
 
 	// Convert the Rating to a 10-point scale
@@ -301,8 +293,7 @@ func GenerateMarkdown(result BookMetadata) (string, error) {
 		if result.Timestamp == "" {
 			formattedTimestamp = ""
 		} else {
-			errorMessage := fmt.Sprintf("while build specific time format for specify registered date: %v", err)
-			return "", fmt.Errorf(errorMessage)
+			return "", fmt.Errorf("while build specific time format for specify registered date: %v", err)
 		}
 	}
 
@@ -325,7 +316,7 @@ func GenerateMarkdown(result BookMetadata) (string, error) {
 	completion := cv.YesNo(result.Completion).(string)
 
 	// Remove HTML tags from the Comments field
-	comments := CommentMarkdownizer(result.Comments)
+	comments := commentMarkdownizer(result.Comments)
 
 	// Get the current timestamp for the Created field
 	created := time.Now().Format("2006-01-02 15:04")
@@ -350,6 +341,9 @@ Category: "[[책]]"
 
 [[%s]] 시리즈의 %s부
 `, series, seriesIndex))
+
+			series = ""
+			seriesIndex = ""
 		}
 	}
 
@@ -380,7 +374,7 @@ Category: "[[책]]"
 
 ***
 %s
-`, Cover, result.Genre, authors, result.Chapter, result.PubDate, completion, rating, formattedTimestamp, result.ID, comments))
+`, cover, result.Genre, authors, result.Chapter, result.PubDate, completion, rating, formattedTimestamp, result.ID, comments))
 
 	// 빌드한 마크다운을 스트링으로
 	markdown := markdownBuilder.String()
@@ -392,8 +386,7 @@ Category: "[[책]]"
 	notefilepath := filepath.Join(cv.MDdir, result.Title+".md")
 	outputFile, err := os.Create(notefilepath)
 	if err != nil {
-		errorMessage := fmt.Sprintf("while create an empty booknote: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("빈 마크다운 문서 생성 실패: %v", err)
 	}
 	defer outputFile.Close()
 
@@ -403,32 +396,36 @@ Category: "[[책]]"
 	for _, line := range lines {
 
 		if _, err := writer.WriteString(line + "\n"); err != nil {
-			errorMessage := fmt.Sprintf("while write a note contents: %v", err)
-			return "", fmt.Errorf(errorMessage)
+			return "", fmt.Errorf("마크다운 내용 채우기 실패: %v", err)
 		}
 	}
 
 	// Flush the writer to ensure all content is written to the file
 	writer.Flush()
-	if err != nil {
-		errorMessage := fmt.Sprintf("while flush the note contents buffer: %v", err)
-		return "", fmt.Errorf(errorMessage)
-	}
+
+	cover = ""
+	rating = 0
+	formattedTimestamp = ""
+	emoji = ""
+	completion = ""
+	comments = ""
+	created = ""
+	lines = nil
+	markdown = ""
 
 	return authors, nil
 }
 
-// CopyAndRenameCover copies the cover image from the source path to the destination path,
+// a. CopyAndRenameCover copies the cover image from the source path to the destination path,
 // renaming it using the MD5 hash of the source path.
 func copyAndRenameCover(bookID int) (string, error) {
 	// Construct the glob pattern to find the correct directory
-	globPattern := fmt.Sprintf("/NAS/samba/Book/*/* (%d)/cover.*", bookID)
+	globPattern := fmt.Sprintf("%s/*/* (%d)/cover.*", cv.Bookdir, bookID)
 
 	// Find the matching file path using the glob pattern
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
-		errorMessage := fmt.Sprintf("while approach to the database directory: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("도서 폴더 접근 실패: %v", err)
 	}
 	if len(matches) == 0 { // no cover page for the book
 		return "", nil //fmt.Errorf("no cover file found for ID: %d", bookID)
@@ -440,16 +437,14 @@ func copyAndRenameCover(bookID int) (string, error) {
 	// Open the source file to binary hashing
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		errorMessage := fmt.Sprintf("while open the cover image: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("커버 이미지 열기 실패: %v", err)
 	}
 	defer sourceFile.Close()
 
 	// Generate the MD5 hash for the new filename based on the content
 	hash := md5.New()
 	if _, err := io.Copy(hash, sourceFile); err != nil {
-		errorMessage := fmt.Sprintf("while read a cover image: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("커버 이미지 읽기 실패: %v", err)
 	}
 	extension := filepath.Ext(sourcePath)
 	newFileName := hex.EncodeToString(hash.Sum(nil))[:32] + extension
@@ -461,32 +456,78 @@ func copyAndRenameCover(bookID int) (string, error) {
 	// Create the destination file
 	destFile, err := os.Create(destinationPath)
 	if err != nil {
-		errorMessage := fmt.Sprintf("while create a empty image: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("이미지 복사 개시 실패: %v", err)
 	}
 	defer destFile.Close()
 
 	// Copy the contents of the source file to the destination file
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
-		errorMessage := fmt.Sprintf("while copy a cover image: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("이미지 복사 실패: %v", err)
 	}
 
+	globPattern = ""
+	matches = nil
+	hash = nil
+	extension = ""
+	newFileName = ""
+	destinationPath = ""
+	sourceFile = nil
+	destFile = nil
 	return newFileName, nil
 }
 
-// 항상 문제가 되는 시간 문자열의 포멧을 관리하는 함수
+// b. 항상 문제가 되는 시간 문자열의 포멧을 관리하는 함수
 // 기존 시간 문자열, 그리고 원하는 포멧을 각각 적어넣으면 됨
 // 예를 들어 "2020-03-05T21:22:30", "2000-03-04 23:11"
 func formatTime(timestamp, targetFormat string) (string, error) {
 	//시간 문자열 받기
 	parsedTime, err := time.Parse(time.RFC3339, timestamp)
 	if err != nil {
-		errorMessage := fmt.Sprintf("while decode a timestamp: %v", err)
-		return "", fmt.Errorf(errorMessage)
+		return "", fmt.Errorf("시간 해석 실패: %v", err)
 	}
 
 	formattedTime := parsedTime.Format(targetFormat)
 
 	return formattedTime, nil
+}
+
+// c. 코멘트 html을 마크다운으로 변환
+func commentMarkdownizer(html string) (markdown string) {
+	// html -> markdown 주의점
+	//     [[]]를 링크로 처리 못하고 \[\[\]\]로 처리함
+	//     그러니까 미리 이걸 <a href> 처리하고 나서 돌려야 함
+	//     그 다음에 []() 형식으로 만들어진 링크들을 전부 [[]]로 변환
+
+	// a. <a href> linker
+	linked, err := cv.CommentLinker(html)
+	if err != nil {
+		lg.Err("임시 html 링크 생성 실패", err)
+	}
+
+	// b. 나머지 html 변환
+	converter := md.NewConverter("", true, nil)
+
+	tempmarkdown, err := converter.ConvertString(linked)
+	if err != nil {
+		lg.Err("마크다운 문법 생성 실패", err)
+	}
+
+	// c. []() 링크를 전부 [[]]로 재변환
+	markdown = reverseCommentLinker(tempmarkdown)
+
+	linked = ""
+	converter = nil
+	tempmarkdown = ""
+	return markdown
+}
+
+// c-a. ReverseCommentLinker replaces <a href="...">some phrase</a> with [[some phrase]]
+func reverseCommentLinker(comments string) string {
+	// Regex to match <a href="...">some phrase</a>
+	re := regexp.MustCompile(`\[(.+?)\]\(.+?\)`)
+
+	// Replace each occurrence with [[some phrase]]
+	result := re.ReplaceAllString(comments, `[[${1}]]`)
+
+	return result
 }

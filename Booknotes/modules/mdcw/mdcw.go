@@ -1,5 +1,8 @@
 package mdcw
 
+// 원드라이브로 동기화된 마크다운파일의 내용을
+// 칼리버 데이터베이스에 반영하는 핸들러
+
 import (
 	cmdr "booknotes/modules/commander"
 	"booknotes/modules/cv"
@@ -16,17 +19,6 @@ import (
 
 	gd "github.com/yuin/goldmark"
 )
-
-/* 변수 리셋하는 법
-
-string = ""
-map = nil
-int = 0
-err = nil
-[]slice = nil
-struct = struct{} || var bookdata BookMetadata
-
-*/
 
 // 메타데이타 스트럭트
 type BookMetadata struct {
@@ -158,6 +150,10 @@ func getBookInfo(filename string) (BookMetadata, error) {
 		return BookMetadata{}, fmt.Errorf("노트 파일 스캔 실패: %v", err)
 	}
 
+	regextag = nil
+	rawTag = ""
+	rawComments = ""
+
 	return bookdata, nil
 }
 
@@ -192,6 +188,8 @@ func convertToHTML(multilineString string) string {
 
 	// Join all paragraphs and wrap in a div
 	htmlContent := "<div>\n" + cleanedResult + "\n</div>"
+	cleanedResult = ""
+	linked = ""
 	return htmlContent
 }
 
@@ -245,6 +243,7 @@ func linkGenerator(phrase string) (string, error) {
 		return fmt.Sprintf("calibre://show-note/Book/authors/hex_%s", hexcode), nil
 	}
 
+	filename = ""
 	return "", fmt.Errorf("링크 주소 생성 실패")
 }
 
