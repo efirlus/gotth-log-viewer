@@ -18,6 +18,7 @@ const (
 	LevelError   = "error"
 	LevelFatal   = "fatal"
 	LevelPanic   = "panic"
+	LevelDebug   = "debug"
 )
 
 // Logger struct to hold information like program name and logger instance
@@ -89,6 +90,17 @@ func Panic(message string, err error) {
 	fullMessage := fmt.Sprintf("%s: %v", message, err)
 	log(LevelPanic, fullMessage, stackTrace)
 	panic(fullMessage)
+}
+
+func Debug(elem ...any) {
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	var message strings.Builder
+	message.WriteString("DEBUG: \n")
+	for _, l := range elem {
+		message.WriteString(fmt.Sprintf("%v\n", l))
+	}
+	log(LevelInfo, message.String(), "")
 }
 
 // log is a helper function to write logs in JSON format
