@@ -3,7 +3,7 @@
 . /home/efirlus/goproject/gobooknotes/logger.sh
 
 # Paths
-DB_FILE="/home/efirlus/goproject/gobooknotes/test/Book/metadata.db"
+DB_FILE="/NAS/samba/Book/metadata.db"
 MD_DIR="/home/efirlus/OneDrive/obsidian/Vault/6. Calibre"
 LOG_FILE="/home/efirlus/goproject/Logs/app.log"
 
@@ -14,28 +14,34 @@ IGNORE_TIME=600
 last_db_event=0
 last_md_event=0
 
-log "info" "tesr5 initiated"
+log "info" "test5 initiated"
 # Monitor events
-inotifywait -m -e close_write --format '%e %w%f' "$DB_FILE" "$MD_DIR"/*.md | while read event file; do
+inotifywait -m \
+    --format '%e %w%f' \
+    -e close_write "$DB_FILE" \
+    -e attrib "$MD_DIR"/*.md | while read event file; do
     current_time=$(date +%s)
-    if [[ "$file" == "$DB_FILE" ]]; then
+    
+    if [[ "$file" == "$DB_FILE" && "$event" == *"CLOSE_WRITE"* ]]; then
         # Handle dbEvent
         if (( current_time > last_md_event + IGNORE_TIME )); then
             # Only process if not within mdEvent ignore window
-            log "info" "dbEvent detected: $file"
-            log "info" "ctime: $current_time // lemd: $last_md_event"
-            log "info" "ignored until: $IGNORE_TIME"
+            log "info" "dbEvent detected: $current_time, wait until db updated"
+            sleep 30
+            log "info" "db synchronization start"
             last_db_event=$current_time
+            ./dbSyncExec
+            log "info" "db synchronization complete"
         else
             log "info" "dbEvent ignored due to mdEvent"
         fi
-
-    elif [[ "$file" == *.md ]]; then
+    elif [[ "$file" == *.md && "$event" == *"ATTRIB"* ]]; then
         # Handle mdEvent
         if (( current_time > last_db_event + IGNORE_TIME )); then
             # Only process if not within dbEvent ignore window
-            log "info" "mdEvent detected: $file"
-            # ./mdSyncExec "$file"
+            log "info" "mdEvent detected: $file at $current_time"
+            sleep 20
+            ./mdSyncExec "$file"
             last_md_event=$current_time
         else
             log "info" "mdEvent ignored due to dbEvent"

@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	MDdir    = "/home/efirlus/OneDrive/obsidian/Vault/6. Calibre"
+	MDdir    = "/home/efirlus/OneDrive/obsidian/Vault/6. Calibre" //
 	CoverDir = "/home/efirlus/OneDrive/obsidian/Vault/images"
 	Bookdir  = "/NAS/samba/Book"
 	LogPath  = "/home/efirlus/goproject/Logs/app.log"
@@ -44,7 +44,7 @@ func main() {
 
 	// 4. 지울 건 지우고
 	if len(notInDB) > 0 {
-		lg.Info(fmt.Sprintf("삭제할 문서들: %v", notInMD))
+		lg.Info(fmt.Sprintf("삭제할 문서들: %v", notInDB))
 
 		for _, title := range notInDB {
 			fullpath := filepath.Join(MDdir, title+".md")
@@ -375,7 +375,6 @@ Category: "[[책]]"
 
 	// Create the output file
 	notefilepath := filepath.Join(MDdir, string(result["Title"])+".md")
-	lg.Info(notefilepath)
 
 	outputFile, err := os.Create(notefilepath)
 	if err != nil {
@@ -395,10 +394,6 @@ Category: "[[책]]"
 
 	// Flush the writer to ensure all content is written to the file
 	writer.Flush()
-
-	for _, l := range lines {
-		lg.Info(l)
-	}
 
 	return nil
 }

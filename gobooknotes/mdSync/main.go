@@ -3,42 +3,169 @@ package main
 import (
 	"fmt"
 	"mdsync/lg"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
-
-	md "github.com/JohannesKaufmann/html-to-markdown"
 )
 
 func main() {
-	src := `
-방송통신심의위원회(방심위)가 인터넷 백과사전 [[나무위키에]] 기재된 특정 인플루언서 페이지에 ‘접속차단’을 의결했다. 불법정보가 아닌 권리침해정보 심의로 나무위키에 방심위가 접속차단 의결을 한 건 이번이 처음이다.
+	d := "/home/efirlus/OneDrive/obsidian/Vault/6. Calibre"
 
-방심위는 16일 [[통신심의소위원회]](통신소위)를 열고 인플루언서 A씨와 B씨의 나무위키 페이지가 사생활 침해라며 접속차단을 의결했다. 방심위는 접속차단 전 [[플랫폼]] 관계자의 의견진술을 들을 수 있지만 이번엔 의견진술 없이 통신사(ISP, [[인터넷서비스사업자]])에 URL 차단을 요청한 것으로 확인됐다.
+	// 1. 리스트 추출
+	listRune, _ := commandExec(listdb())
+	calibreDBMap := processEntries(splitByRuneValue(listRune, 10))
+	fmt.Println("-------------- db 추출 맵 -----------------")
+	fmt.Println(calibreDBMap)
 
-연합뉴스에 따르면 방송 출연 경험이 있는 인플루언서 A씨는 나무위키에 노출된 [[전 연인]]과의 노출 및 스킨십 사진으로 성적 수치심을 느낀다며 방심위에 삭제를 요청했다. 인플루언서 B씨도 나무위키에 본인 동의 없이 2013년부터 2023년까지의 생애와 사진, 본명, 출생, 국적, 신체, 학력, [[수상 경력]]까지 나와 있다고 삭제를 요청했다.
+	// 2. 디렉토리 추출
+	mdList := grabListofMD(d)
+	fmt.Println("---------- directory 추출 ----------------")
+	fmt.Println(mdList)
 
-방심위 통신자문특별위원회는 [[인플루언서 A씨]]와 B씨의 민원에 대해 신고인이 원하지 않고 사생활 침해 소지가 있다며 시정 요구가 필요하다는 다수 의견을 냈다. 방심위 역시 이에 근거해 접속차단을 의결한 것으로 알려졌다.
+	// 3. 둘 비교
+	notInMD, notInDB := findMissingItems(calibreDBMap, mdList)
 
-익명의 방심위 관계자는 연합뉴스에 “기존 기조를 바꾼 첫 번째 사례”라며 “해외에 있는 사이트라 개별 삭제 차단 요청을 할 수는 없으나 이렇게 계속 [[의결 및 경고]]를 하고, 시정이 되지 않으면 사례 누적을 확인해 나무위키 전체에 대한 차단도 할 수 있다”고 했다.
-
-출처 : 미디어오늘(https://www.mediatoday.co.kr)
-`
-
-	converter := md.NewConverter("", true, nil)
-
-	tempmarkdown, err := converter.ConvertString(src)
-	if err != nil {
-		lg.Err("마크다운 문법 생성 실패", err)
-	}
-	fmt.Println(tempmarkdown)
-
-	mdf := replaceBrackets(tempmarkdown)
-	fmt.Println(mdf)
-
+	fmt.Println("--------------- md 없는 것 ---------------")
+	fmt.Println(notInMD)
+	fmt.Println("--------------- db 없는 것 ---------------")
+	fmt.Println(notInDB)
 }
 
-func replaceBrackets(content string) string {
-	// Replace escaped brackets with regular brackets
-	content = strings.ReplaceAll(content, `\[\[`, `[[`)
-	content = strings.ReplaceAll(content, `\]\]`, `]]`)
-	return content
+// 1. dblist를 매핑
+func processEntries(lines map[int][]rune) map[string]int {
+	results := make(map[string]int)
+
+	for i, line := range lines {
+		if i == 0 {
+			continue
+		}
+
+		idTitle := splitByPattern(line, []rune{61, 45, 61, 45, 61}) // "=-=-="
+
+		if len(idTitle) > 1 {
+			id := slices.DeleteFunc(idTitle[0], func(r rune) bool { // 아이디에서 ' ' 삭제
+				return r == 32
+			})
+			intid, err := strconv.Atoi(string(id))
+			if err != nil {
+				lg.Err("아이디 정수화 실패", err)
+			}
+			// 키는 string title, 값은 int id
+			results[string(idTitle[1])] = intid
+		}
+	}
+	return results
+}
+
+// 라인브레이크용
+func splitByRuneValue(target []rune, splitRune rune) map[int][]rune {
+	result := make(map[int][]rune)
+	chunk := []rune{}
+	chunkIndex := 1
+
+	for _, val := range target {
+		if val == splitRune {
+			if len(chunk) > 0 {
+				result[chunkIndex] = chunk
+				chunkIndex++
+			}
+			chunk = []rune{} // Start a new chunk after the split
+		} else {
+			chunk = append(chunk, val)
+		}
+	}
+
+	// Add the final chunk if it has any elements
+	if len(chunk) > 0 {
+		result[chunkIndex] = chunk
+	}
+
+	return result
+}
+
+func splitByPattern(slice, pattern []rune) map[int][]rune {
+	resmap := make(map[int][]rune)
+	start := 0
+	for i := 0; i <= len(slice)-len(pattern); i++ {
+		if slices.Equal(slice[i:i+len(pattern)], pattern) {
+			if i > start {
+				resmap[0] = slice[start:i]
+			}
+			start = i + len(pattern)
+			i = start - 1 // -1 because the loop will increment i
+		}
+	}
+	if start < len(slice) {
+		resmap[1] = slice[start:]
+	}
+	return resmap
+}
+
+func grabListofMD(MDdir string) []string {
+	var dirList []string
+	files, err := os.ReadDir(MDdir)
+	if err != nil {
+		lg.Fatal("md 디렉토리 목록 읽기 실패", err)
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && filepath.Ext(file.Name()) == ".md" {
+			dirList = append(dirList, strings.TrimSuffix(file.Name(), filepath.Ext(file.Name())))
+		}
+	}
+
+	return dirList
+}
+
+// 3. 맵과 directory 리스트 비교
+func findMissingItems(m map[string]int, slice []string) (map[int]string, []string) {
+	// Create a set from the slice for efficient lookup
+	sliceSet := make(map[string]bool)
+	resultMap := make(map[int]string)
+	for _, item := range slice {
+		sliceSet[item] = true
+	}
+
+	// Find IDs in the map that are not in the slice
+	for key, id := range m {
+		if _, exists := sliceSet[key]; !exists {
+			resultMap[id] = key
+		}
+	}
+
+	// Find strings in the slice that are not in the map
+	missingStrings := []string{}
+	for _, item := range slice {
+		if _, exists := m[item]; !exists {
+			missingStrings = append(missingStrings, item)
+		}
+	}
+
+	return resultMap, missingStrings
+}
+
+// 0. 기본 커맨드 빌더
+func commandBuilder(additional []string) []string {
+	basic := []string{"calibredb", "--with-library=http://localhost:8080", "--username", "efirlus", "--password", "<f:/home/efirlus/calpass/calpass>"}
+	return append(basic, additional...)
+}
+
+// 1-a. 리스트 커맨드
+func listdb() []string {
+	addit := []string{"list", "-f", "id, title", "--separator", "=-=-="}
+	return commandBuilder(addit)
+}
+
+// 2. 커맨드 실행 (에러 반환)
+func commandExec(comm []string) ([]rune, error) {
+	cmd := exec.Command(comm[0], comm[1:]...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("cannot exec command [%v]: %v", comm, err)
+	}
+
+	return []rune(string(output)), nil
 }

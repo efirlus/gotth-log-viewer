@@ -1,0 +1,5 @@
+Logs/
+*.log
+gobooknotes/dbSyncExec
+gobooknotes/mdSyncExec
+*.out
