@@ -1,5 +1,5 @@
 Logs/
 *.log
-gobooknotes/dbSyncExec
-gobooknotes/mdSyncExec
+*Exec
 *.out
+**/backup/
