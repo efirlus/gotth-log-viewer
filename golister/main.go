@@ -19,7 +19,7 @@ func main() {
 	lg.NewLogger("goLister")
 	lg.Info("======== initiated ========")
 	if len(os.Args) != 2 { // golister 에 인수가 하나도 없을 때
-		fmt.Println("Usage: golister <number>\n\n1. MMD horizontal\n2. PMV\n3. Fancam")
+		fmt.Println("Usage: golister <number>\n\n1. MMD horizontal\n2. PMV\n3. Fancam\n4. AV")
 		return
 	}
 
@@ -38,14 +38,14 @@ func main() {
 	// 2. directory parser
 	폴더, err := indexing.DirectoryLister(Conf.MediaDirectory)
 	if err != nil {
-		lg.Fatal("failed listing directory: %s", err)
+		lg.Err("failed listing directory", err)
 	}
 
 	// 3. shuffling
-	result, forMobile := shuffle.ListRebuilder(재생목록, 폴더)
+	result, forMobile := shuffle.ListRebuilder(재생목록, 폴더, Conf.ModName)
 
 	// 4. file writing
 	if err := iomod.CreatePlayList(result, forMobile, Conf.MediaDirectory, Conf.ModName); err != nil {
-		lg.Fatal("writeLines: %s", err)
+		lg.Err("writeLines: %s", err)
 	}
 }

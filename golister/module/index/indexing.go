@@ -3,43 +3,203 @@ package indexing
 import (
 	"bufio"
 	"fmt"
+	"golister/module/lg"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// 목표 디렉토리를 훑으며 파일목록을 반환
-func DirectoryLister(targetDir string) ([]string, error) {
-	폴더 := make([]string, 0)
-	iter := len(targetDir)
+type Walker struct {
+	// Track visited paths to prevent cycles
+	visited map[string]bool
+	// Track symlink mappings at depth 1
+	symlinkMappings map[string]string
+	// Root directory for the walk
+	root string
+	// Absolute path of root
+	rootAbs string
+}
 
-	err := filepath.Walk(targetDir,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
+func NewWalker(root string) (*Walker, error) {
+	rootAbs, err := filepath.Abs(root)
 
-			if !info.IsDir() && isVideoFile(path) {
-				폴더 = append(폴더, path[iter:])
-			}
-			return nil
-		})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
 	}
-	// loginfo len(폴더) parsed
-	return 폴더, nil
+
+	return &Walker{
+		visited:         make(map[string]bool),
+		symlinkMappings: make(map[string]string),
+		root:            root,
+		rootAbs:         rootAbs,
+	}, nil
+}
+
+func (w *Walker) resolveSymlink(path string) (string, error) {
+	target, err := os.Readlink(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read symlink: %w", err)
+	}
+
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+
+	target, err = filepath.Abs(target)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for symlink target: %w", err)
+	}
+
+	return target, nil
+}
+
+func (w *Walker) identifyRootSymlinks() error {
+	entries, err := os.ReadDir(w.rootAbs)
+	if err != nil {
+		return fmt.Errorf("failed to read root directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.Type()&os.ModeSymlink != 0 {
+			fullPath := filepath.Join(w.rootAbs, entry.Name())
+			target, err := w.resolveSymlink(fullPath)
+			if err != nil {
+				// Log error but continue with other symlinks
+				lg.Err(fmt.Sprintf("Warning: failed to resolve symlink %s", fullPath), err)
+				continue
+			}
+			w.symlinkMappings[target] = fullPath
+		}
+	}
+
+	return nil
+}
+
+func (w *Walker) walkDir(path string, info os.FileInfo, videos *[]string) error {
+	// Prevent cycles by tracking visited paths
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	if w.visited[absPath] {
+		return nil
+	}
+	w.visited[absPath] = true
+
+	// Handle symlinks
+	if info.Mode()&os.ModeSymlink != 0 {
+		relPath, err := filepath.Rel(w.rootAbs, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		// Only follow symlinks at depth 1
+		if filepath.Dir(relPath) != "." {
+			return filepath.SkipDir
+		}
+
+		target, err := w.resolveSymlink(path)
+		if err != nil {
+			return fmt.Errorf("failed to resolve symlink: %w", err)
+		}
+
+		targetInfo, err := os.Stat(target)
+		if err != nil {
+			return fmt.Errorf("failed to stat symlink target: %w", err)
+		}
+
+		return w.walkDir(target, targetInfo, videos)
+	}
+
+	// Process regular files and directories
+	if !info.IsDir() {
+		if isVideoFile(path) {
+			// Check if this file is under a symlinked directory
+			for realPath, symlinkPath := range w.symlinkMappings {
+				if rel, err := filepath.Rel(realPath, path); err == nil && !filepath.IsAbs(rel) {
+					// Reconstruct path using symlink
+					path = filepath.Join(symlinkPath, rel)
+					break
+				}
+			}
+
+			absPath, err := filepath.Abs(path)
+			if err == nil {
+				relPath := strings.TrimPrefix(absPath, w.rootAbs)
+				relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
+				*videos = append(*videos, relPath)
+			}
+		}
+		return nil
+	}
+
+	// Read directory entries
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		fullPath := filepath.Join(path, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			lg.Err(fmt.Sprintf("Warning: failed to get info for %s", fullPath), err)
+			continue
+		}
+
+		if err := w.walkDir(fullPath, info, videos); err != nil {
+			lg.Err(fmt.Sprintf("Warning: error processing %s", fullPath), err)
+		}
+	}
+
+	return nil
+}
+
+func DirectoryLister(root string) ([]string, error) {
+	walker, err := NewWalker(root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create walker: %w", err)
+	}
+
+	if err := walker.identifyRootSymlinks(); err != nil {
+		return nil, fmt.Errorf("failed to identify root symlinks: %w", err)
+	}
+
+	rootInfo, err := os.Stat(walker.rootAbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat root directory: %w", err)
+	}
+
+	var videos []string
+	if err := walker.walkDir(walker.rootAbs, rootInfo, &videos); err != nil {
+		return nil, fmt.Errorf("failed to walk directory: %w", err)
+	}
+
+	return videos, nil
+}
+
+var videoExtensions = map[string]struct{}{
+	".mp4": {}, ".mkv": {}, ".avi": {}, ".m4v": {}, ".mov": {}, ".wmv": {}, ".webm": {},
+	".flv": {}, ".f4v": {}, ".f4p": {}, ".f4a": {}, ".f4b": {},
+	".3gp": {}, ".3g2": {},
+	".rmvb": {}, ".rm": {},
+	".ts": {}, ".m2ts": {}, ".mts": {},
+	".vob": {},
+	".ogv": {}, ".ogg": {},
+	".mpg": {}, ".mpeg": {}, ".mpe": {},
+	".divx": {}, ".xvid": {},
+	".mxf": {},
+	".dv":  {},
+	".asf": {},
+	".qt":  {},
+	".amv": {},
 }
 
 func isVideoFile(path string) bool {
-	//동영상인지 체크하는 함수
-	extensions := []string{".mp4", ".mkv", ".avi", ".m4v", ".mov", ".wmv", ".webm"}
-	for _, ext := range extensions {
-		if strings.HasSuffix(path, ext) {
-			return true
-		}
-	}
-	return false
+	ext := strings.ToLower(filepath.Ext(path))
+	_, exists := videoExtensions[ext]
+	return exists
 }
 
 func CountLines(file *os.File) (int, error) {

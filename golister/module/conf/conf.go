@@ -16,6 +16,7 @@ func VariableBuilder(a int) *PathConfig {
 		1: {"/NAS4", "MMD"},
 		2: {"/NAS2/priv", "PMV"},
 		3: {"/NAS3/samba", "Fancam"},
+		4: {"/NAS2/priv", "AV"},
 		0: {"debug", "test"},
 	}
 
@@ -26,7 +27,7 @@ func VariableBuilder(a int) *PathConfig {
 	}
 
 	mediaDirectory := config[0] + "/" + config[1]
-	backup := "backup_" + config[1] + ".bkp"
+	backup := "./backup/backup_" + config[1] + ".bkp"
 	indexFile := config[0] + "/watch/" + strings.ToLower(config[1]) + ".dpl"
 
 	return &PathConfig{
