@@ -18,16 +18,16 @@ log "info" "test5 initiated"
 # Monitor events
 inotifywait -m \
     --format '%e %w%f' \
-    -e close_write "$DB_FILE" \
+    -e modify "$DB_FILE" \
     -e attrib "$MD_DIR"/*.md | while read event file; do
     current_time=$(date +%s)
     
-    if [[ "$file" == "$DB_FILE" && "$event" == *"CLOSE_WRITE"* ]]; then
+    if [[ "$file" == "$DB_FILE" && "$event" == *"MODIFY"* ]]; then
         # Handle dbEvent
         if (( current_time > last_md_event + IGNORE_TIME )); then
             # Only process if not within mdEvent ignore window
             log "info" "dbEvent detected: $current_time, wait until db updated"
-            sleep 30
+            sleep 120
             log "info" "db synchronization start"
             last_db_event=$current_time
             ./dbSyncExec

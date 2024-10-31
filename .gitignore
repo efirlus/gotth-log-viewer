@@ -3,3 +3,4 @@ Logs/
 *Exec
 *.out
 **/backup/
+tmp/
