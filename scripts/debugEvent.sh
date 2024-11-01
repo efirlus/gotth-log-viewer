@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Directory to monitor
-MONITOR_DIR="/NAS/samba/Book/metadata.db"
+MONITOR_DIR="/NAS4/ts"
 
 # Log file
 LOG_FILE="/home/efirlus/goproject/Logs/app.log"
