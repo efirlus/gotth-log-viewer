@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"regexp"
@@ -11,8 +13,8 @@ import (
 )
 
 func main() {
-	fmt.Println(perfectlySphericalHousesInAVacuum2(getInput(3)))
-
+	fmt.Println(doesntHeHaveInternElvesForThis(getInput(5)))
+	//fmt.Println("is he nice? : ", naughtyOrNice2("qjhvhtzxzqqjkmpb"))
 }
 
 func getInput(dayNumber int) string {
@@ -26,6 +28,81 @@ func getInput(dayNumber int) string {
 	return string(contentByte)
 }
 
+func doesntHeHaveInternElvesForThis(inp string) int {
+	goodKids := 0
+	lines := strings.Split(inp, "\n")
+	for _, line := range lines {
+		if naughtyOrNice2(line) {
+			goodKids++
+		}
+	}
+	return goodKids
+}
+
+func naughtyOrNice1(line string) bool {
+	var before rune
+
+	re := regexp.MustCompile(`[aeiou]`)
+	match := re.FindAllStringSubmatch(line, -1)
+
+	r := []rune(line)
+	hasSec := slices.ContainsFunc(r, func(n rune) bool {
+		answer := false
+		if before == n {
+			answer = true
+		} else {
+			before = n
+		}
+		return answer
+	})
+
+	hasNaughty, _ := regexp.MatchString(`ab|cd|pq|xy`, line)
+
+	if len(match) >= 3 && hasSec && !hasNaughty {
+		return true
+	}
+	return false
+}
+
+func naughtyOrNice2(line string) bool {
+	r := []rune(line)
+	var hasOoO bool
+	var hasDup bool
+
+	for i := range len(r) - 2 {
+		if r[i] == r[i+2] {
+			hasOoO = true
+		}
+
+		if strings.Contains(line[i+2:], string(r[i:i+2])) {
+			hasDup = true
+		}
+	}
+
+	if hasOoO && hasDup {
+		return true
+	}
+	return false
+}
+
+// 4일차
+func adventCoin(inp string) string {
+	h := md5.New()
+	io.WriteString(h, inp)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func theIdealStockingStuffer(inp, pref string) int {
+	coinage := "abcdef"
+	key := 1
+	for !strings.HasPrefix(coinage, pref) {
+		key++
+		coinage = adventCoin(inp + strconv.Itoa(key))
+	}
+	return key
+}
+
+// 3일차
 func perfectlySphericalHousesInAVacuum(inp string) int {
 	// up = 94, right = 62, down = 118, left = 60
 	mapForSanta := make(map[string]int)
@@ -91,6 +168,7 @@ func perfectlySphericalHousesInAVacuum2(inp string) int {
 	return len(mapForPresent)
 }
 
+// 2일차
 func iWasToldThereWouldBeNoMath(inp string) map[int][]int {
 	lines := strings.Split(inp, "\n")
 	re := regexp.MustCompile(`(\d*)x(\d*)x(\d*)`)
@@ -132,6 +210,7 @@ func forRibbon(boxes map[int][]int) int {
 	return total
 }
 
+// 1일차
 func notQuiteLisp1(inp string) int {
 	return 0 + strings.Count(inp, "(") - strings.Count(inp, ")")
 }
