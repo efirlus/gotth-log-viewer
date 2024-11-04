@@ -19,7 +19,7 @@ export async function fetchLogs(): Promise<LogEntry[]> {
       timestamp: log.time || log.timestamp || new Date().toISOString(),
       level: (log.loglevel || log.level || log.severity || 'info').toLowerCase(),
       program: log.programname || log.program || log.service || 'unknown',
-      message: log.message || log.msg || log.text || String(log),
+      message: log.message || log.msg || log.text || log.logstring || String(log),
       location: log.location || undefined,
       raw: log  // Store the original log entry for debugging
     }));

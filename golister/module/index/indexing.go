@@ -149,7 +149,7 @@ func (w *Walker) walkDir(path string, info os.FileInfo, videos *[]string) error 
 		}
 
 		if err := w.walkDir(fullPath, info, videos); err != nil {
-			lg.Err(fmt.Sprintf("Warning: error processing %s", fullPath), err)
+			lg.Warn(fmt.Sprintf("Warning: error processing %s", fullPath))
 		}
 	}
 
