@@ -13,8 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Println(doesntHeHaveInternElvesForThis(getInput(5)))
-	//fmt.Println("is he nice? : ", naughtyOrNice2("qjhvhtzxzqqjkmpb"))
+	fmt.Println(ProbablyAFireHazard2(getInput(6)))
 }
 
 func getInput(dayNumber int) string {
@@ -28,18 +27,86 @@ func getInput(dayNumber int) string {
 	return string(contentByte)
 }
 
-func doesntHeHaveInternElvesForThis(inp string) int {
-	goodKids := 0
+func ProbablyAFireHazard1(inp string) int {
+	var lightMap [1000][1000]bool
 	lines := strings.Split(inp, "\n")
+	lighted := 0
+
 	for _, line := range lines {
-		if naughtyOrNice2(line) {
-			goodKids++
+		re := regexp.MustCompile(`^(.*) (\d*),(\d*) through (\d*),(\d*)$`)
+		match := re.FindAllStringSubmatch(line, -1)
+
+		wStart, _ := strconv.Atoi(match[0][2])
+		wEnd, _ := strconv.Atoi(match[0][4])
+		hStart, _ := strconv.Atoi(match[0][3])
+		hEnd, _ := strconv.Atoi(match[0][5])
+
+		for w := wStart; w <= wEnd; w++ {
+			for h := hStart; h <= hEnd; h++ {
+				switch match[0][1] {
+				case "turn on":
+					lightMap[w][h] = true
+				case "turn off":
+					lightMap[w][h] = false
+				case "toggle":
+					lightMap[w][h] = !lightMap[w][h]
+				}
+			}
 		}
 	}
-	return goodKids
+
+	for w := 0; w <= 999; w++ {
+		for h := 0; h <= 999; h++ {
+			if lightMap[w][h] {
+				lighted++
+			}
+		}
+	}
+
+	return lighted
 }
 
-func naughtyOrNice1(line string) bool {
+func ProbablyAFireHazard2(inp string) int {
+	var lightMap [1000][1000]int
+	lines := strings.Split(inp, "\n")
+	lighted := 0
+
+	for _, line := range lines {
+		re := regexp.MustCompile(`^(.*) (\d*),(\d*) through (\d*),(\d*)$`)
+		match := re.FindAllStringSubmatch(line, -1)
+
+		wStart, _ := strconv.Atoi(match[0][2])
+		wEnd, _ := strconv.Atoi(match[0][4])
+		hStart, _ := strconv.Atoi(match[0][3])
+		hEnd, _ := strconv.Atoi(match[0][5])
+
+		for w := wStart; w <= wEnd; w++ {
+			for h := hStart; h <= hEnd; h++ {
+				switch match[0][1] {
+				case "turn on":
+					lightMap[w][h]++
+				case "turn off":
+					if lightMap[w][h] != 0 {
+						lightMap[w][h]--
+					}
+				case "toggle":
+					lightMap[w][h] += 2
+				}
+			}
+		}
+	}
+
+	for w := 0; w <= 999; w++ {
+		for h := 0; h <= 999; h++ {
+			lighted += lightMap[w][h]
+		}
+	}
+
+	return lighted
+}
+
+// 5일차
+func doesntHeHaveInternElvesForThis1(line string) bool {
 	var before rune
 
 	re := regexp.MustCompile(`[aeiou]`)
@@ -64,7 +131,7 @@ func naughtyOrNice1(line string) bool {
 	return false
 }
 
-func naughtyOrNice2(line string) bool {
+func doesntHeHaveInternElvesForThis2(line string) bool {
 	r := []rune(line)
 	var hasOoO bool
 	var hasDup bool

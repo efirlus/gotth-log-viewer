@@ -7,9 +7,9 @@ log "info" "sync with watched result"
 
 # Define arrays for log and dpl paths for each directory
 declare -A log_paths=(
-    ["MMD"]="/home/efirlus/goproject/Logs/mmd-path.log"
-    ["Fancam"]="/home/efirlus/goproject/Logs/fancam-path.log"
-    ["PMV"]="/home/efirlus/goproject/Logs/pmv-path.log"
+    ["MMD"]="/home/efirlus/goproject/Logs/MMD.pathlog"
+    ["Fancam"]="/home/efirlus/goproject/Logs/Fancam.pathlog"
+    ["PMV"]="/home/efirlus/goproject/Logs/PMV.pathlog"
 )
 
 declare -A dpl_paths=(

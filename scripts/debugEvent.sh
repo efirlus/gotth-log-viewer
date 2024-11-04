@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Directory to monitor
-MONITOR_DIR="/NAS4/ts"
+MONITOR_DIR="/NAS4/MMD"
 
 # Log file
-LOG_FILE="/home/efirlus/goproject/Logs/app.log"
+LOG_FILE="/home/efirlus/goproject/Logs/apptest.log"
 
 # Start monitoring with inotifywait and log all events
 inotifywait -m -r \
