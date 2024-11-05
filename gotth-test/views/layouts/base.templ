@@ -1,4 +1,8 @@
-package layout
+package layouts
+
+import (
+	"gotthtest/views/components"
+)
 
 templ Base() {
 	<!DOCTYPE html>
@@ -15,6 +19,7 @@ templ Base() {
 			<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 		</head>
 		<body class="antialiased">
+			@components.Navigation()
 			{ children... }
 		</body>
 	</html>

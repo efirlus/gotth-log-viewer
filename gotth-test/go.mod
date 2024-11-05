@@ -1,4 +1,4 @@
-module gotthlogviewer
+module gotthtest
 
 go 1.23.1
 

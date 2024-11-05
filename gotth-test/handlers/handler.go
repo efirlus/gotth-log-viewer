@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"gotthlogviewer/views/index"
+	"gotthtest/views/index"
 	"net/http"
 	"strconv"
 	"sync"

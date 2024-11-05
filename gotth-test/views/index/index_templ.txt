@@ -1,0 +1,1 @@
+<div class=\"flex items-center\"><div><strong>Andrew Alfred</strong> <span>Technical advisor</span></div></div>
