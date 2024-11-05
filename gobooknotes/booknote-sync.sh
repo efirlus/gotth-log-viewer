@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. /home/efirlus/goproject/gobooknotes/logger.sh
+. /home/efirlus/goproject/scripts/logger.sh
 LOG_FILE="/home/efirlus/goproject/Logs/app.log"
 
 log "info" "sync initiated"

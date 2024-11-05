@@ -25,9 +25,12 @@ monitor_directory() {
     local dir_path=$1
     local dir_num=$2
     
-    inotifywait -m -r -e close_nowrite --format '%w%f' "$dir_path" | while read -r path; do
-        log "info" "$dir_num accessed: $path"
-        update_pathlog "$dir_num" "$path"
+	inotifywait -m -r -e close_nowrite --format '%w%f' "$dir_path" | while read -r path; do
+        # Check if the file is of video mimetype
+        if file --mime-type "$path" | grep -q '^.*: video/'; then
+            log "info" "$dir_num accessed: $path"
+            update_pathlog "$dir_num" "$path"
+        fi
     done &
 }
 
