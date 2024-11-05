@@ -27,7 +27,7 @@ func VariableBuilder(a int) *PathConfig {
 	}
 
 	mediaDirectory := config[0] + "/" + config[1]
-	backup := "/home/efirlus/goproject/golister/backup/backup_" + config[1] + ".bkp"
+	backup := "/home/efirlus/goproject/Logs/backup/backup_" + config[1] + ".bkp"
 	indexFile := config[0] + "/watch/" + strings.ToLower(config[1]) + ".dpl"
 
 	return &PathConfig{

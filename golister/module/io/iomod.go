@@ -100,7 +100,7 @@ func whereIReadBefore(filepath string) (string, error) {
 	var targetPath string
 
 	// regex trimming for prefix
-	r := regexp.MustCompile(`^playname=[a-zA-Z]:\\[^\\]+\\`)
+	r := regexp.MustCompile(`^playname=[A-Z]:\\[^\\/]+[\\/]`)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

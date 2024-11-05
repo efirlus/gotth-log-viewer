@@ -19,7 +19,7 @@ func main() {
 	lg.NewLogger("goLister")
 	lg.Info("======== initiated ========")
 	if len(os.Args) != 2 { // golister 에 인수가 하나도 없을 때
-		fmt.Println("Usage: golister <number>\n\n1. MMD horizontal\n2. PMV\n3. Fancam\n4. AV")
+		fmt.Println("golister version 3.0.1\nUsage: golister <number>\n\n1. MMD horizontal\n2. PMV\n3. Fancam\n4. AV")
 		return
 	}
 

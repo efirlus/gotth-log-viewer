@@ -1,13 +1,28 @@
-package indexing
+package main
 
 import (
 	"bufio"
 	"fmt"
-	"golister/module/lg"
 	"os"
 	"path/filepath"
 	"strings"
+	"testfsnotify/modules/lg"
 )
+
+func main() {
+	dir, err := DirectoryLister("/NAS4/MMD")
+	if err != nil {
+		fmt.Println(err)
+	}
+	//fmt.Println(len(dir))
+	printArray(dir)
+}
+
+func printArray(dir []string) {
+	for _, f := range dir {
+		fmt.Println(f)
+	}
+}
 
 type Walker struct {
 	// Track visited paths to prevent cycles
@@ -119,16 +134,22 @@ func (w *Walker) walkDir(path string, info os.FileInfo, videos *[]string) error 
 			for realPath, symlinkPath := range w.symlinkMappings {
 				if rel, err := filepath.Rel(realPath, path); err == nil && !filepath.IsAbs(rel) {
 					// Reconstruct path using symlink
+
 					path = filepath.Join(symlinkPath, rel)
+
+					//fmt.Println("디버그: 완성경로 -", realPath, symlinkPath, path)
 					break
 				}
 			}
 
 			absPath, err := filepath.Abs(path)
 			if err == nil {
+
 				relPath := strings.TrimPrefix(absPath, w.rootAbs)
 				relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
 				*videos = append(*videos, relPath)
+
+				//fmt.Println("디버그: 앱스경로 -", absPath, relPath)
 			}
 		}
 		return nil
@@ -149,7 +170,7 @@ func (w *Walker) walkDir(path string, info os.FileInfo, videos *[]string) error 
 		}
 
 		if err := w.walkDir(fullPath, info, videos); err != nil {
-			lg.Warn(fmt.Sprintf("Warning: error processing %s", fullPath))
+			lg.Err(fmt.Sprintf("Warning: error processing %s", fullPath), err)
 		}
 	}
 
@@ -176,9 +197,9 @@ func DirectoryLister(root string) ([]string, error) {
 		return nil, fmt.Errorf("failed to walk directory: %w", err)
 	}
 
-	videos = deletePrefix(videos, "NAS2/PMV/")
+	nvideos := deletePrefix(videos, "NAS2/PMV/")
 
-	return videos, nil
+	return nvideos, nil
 }
 
 var videoExtensions = map[string]struct{}{
@@ -226,6 +247,7 @@ func FindTargetIndex(target string, playlist []string) (int, error) {
 func deletePrefix(fromDir []string, prefix string) []string {
 	var remade []string
 	for _, f := range fromDir {
+		//fmt.Println("현재경로:", f)
 		if strings.HasPrefix(f, prefix) {
 			remade = append(remade, f[len(prefix):])
 		} else {
