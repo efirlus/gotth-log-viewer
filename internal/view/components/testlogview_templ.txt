@@ -1,0 +1,14 @@
+<div class=\"min-h-screen bg-base p-6\"><div class=\"max-w-7xl mx-auto\"><div class=\"mb-8\"><h1 class=\"text-3xl font-bold text-text mb-4\">Log Viewer</h1><div class=\"bg-mantle rounded-lg shadow-lg p-4 mb-6 border border-surface0\"><div class=\"flex items-center gap-4\"><div class=\"flex-1 relative\"><span class=\"absolute left-3 top-1/2 -translate-y-1/2 text-subtext\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle> <line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"></line></svg></span> <input type=\"text\" placeholder=\"Search logs...\" class=\"w-full pl-10 pr-4 py-2 bg-crust text-text border border-surface0 rounded-lg focus:ring-2 focus:ring-blue focus:border-transparent\"></div><select class=\"px-4 py-2 bg-crust text-text border border-surface0 rounded-lg focus:ring-2 focus:ring-blue\"><option value=\"\">All Levels</option> <option value=\"error\">Error</option> <option value=\"warn\">Warning</option> <option value=\"info\">Info</option> <option value=\"debug\">Debug</option></select></div></div><div class=\"space-y-4\">
+<div class=\"bg-mantle rounded-lg shadow-lg overflow-hidden border border-surface0 hover:border-blue transition-colors\"><div class=\"p-4\"><div class=\"flex items-center gap-3 mb-2\"><span class=\"text-sm text-subtext font-mono\">
+</span> 
+<span class=\"
+\">
+</span> 
+<span class=\"px-2 py-0.5 rounded-full text-xs font-medium bg-lavender text-crust\">
+</span>
+</div><div class=\"pl-4 border-l-2 border-surface0\"><p class=\"font-mono text-text whitespace-pre-wrap\">
+</p>
+<div class=\"mt-2 text-sm font-mono text-subtext opacity-75\">
+</div>
+</div></div></div>
+</div></div></div></div>

@@ -1,7 +1,0 @@
-Logs/
-*.log
-*Exec
-*.out
-**/backup/
-tmp/
-exec/
