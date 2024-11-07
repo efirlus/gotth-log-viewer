@@ -1,1 +1,0 @@
-<div class=\"text-xl bg-red-500\">Hello GoTTH Project</div>

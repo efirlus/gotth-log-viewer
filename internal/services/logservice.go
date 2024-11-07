@@ -6,15 +6,21 @@ import (
 	"gotthlogviewer/internal/types"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
-type LogReader struct {
+type LogService struct {
 	filepath string
+	cache    []types.LogEntry
+	lastRead time.Time
+	mu       sync.RWMutex
 }
 
-func NewLogReader(filepath string) *LogReader {
-	return &LogReader{filepath: filepath}
+func NewLogService(filepath string) *LogService {
+	return &LogService{
+		filepath: filepath,
+	}
 }
 
 // getStringValue tries multiple field names and returns the first non-empty value
@@ -128,8 +134,25 @@ func normalizeLogLevel(level string) string {
 	}
 }
 
-func (lr *LogReader) ReadLogs() ([]types.LogEntry, error) {
-	file, err := os.Open(lr.filepath)
+func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
+	ls.mu.RLock()
+
+	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
+		logs := ls.cache
+		ls.mu.RUnlock()
+		return logs, nil
+	}
+	ls.mu.RUnlock()
+
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+
+	// Double-check cache after getting write lock
+	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
+		return ls.cache, nil
+	}
+
+	file, err := os.Open(ls.filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +173,9 @@ func (lr *LogReader) ReadLogs() ([]types.LogEntry, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+
+	ls.cache = logs
+	ls.lastRead = time.Now()
 
 	return logs, nil
 }

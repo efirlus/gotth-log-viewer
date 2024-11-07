@@ -2,6 +2,7 @@ package main
 
 import (
 	"gotthlogviewer/internal/handlers"
+	"gotthlogviewer/internal/services"
 	"gotthlogviewer/internal/shared"
 
 	"log/slog"
@@ -21,14 +22,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	logService := services.NewLogService("test.app.log")
+	h := handlers.LogHandler(logService)
+
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
 	// in your main.go or routes setup
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-
 	mux.HandleFunc("/", shared.Make(handlers.HandleRoot))
-	mux.HandleFunc("/index", shared.Make(handlers.HandleIndex))
+	mux.HandleFunc("GET /api/logs", shared.Make(h.HandleLogsSearch))
+	mux.HandleFunc("/index", shared.Make(h.HandleIndex))
 
 	// Start server
 	listenAddr := os.Getenv("LISTEN_ADDR")
