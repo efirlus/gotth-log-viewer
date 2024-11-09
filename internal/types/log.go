@@ -1,9 +1,9 @@
 package types
 
 type LogFilters struct {
-	Program *string `json:"program"`
-	Level   *string `json:"level"`
-	Search  string  `json:"search"`
+	Program string `json:"program"`
+	Level   string `json:"level"`
+	Search  string `json:"search"`
 }
 
 type LogEntry struct {

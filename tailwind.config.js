@@ -37,6 +37,10 @@ module.exports = {
       white: '#ffffff',
       black: '#000000',
     },
+    fontFamily: {
+      'fira': ['"Fira Code"', 'monospace'],
+      'cjk': ['"Noto Sans KR"', 'sans-serif']
+    }
   },
   plugins: [],
 }

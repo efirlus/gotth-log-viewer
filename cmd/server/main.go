@@ -23,21 +23,25 @@ func main() {
 	}
 
 	logService := services.NewLogService("test.app.log")
-	h := handlers.LogHandler(logService)
+	handler := handlers.NewLogHandler(logService)
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	// in your main.go or routes setup
+	// Static files
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	mux.HandleFunc("/", shared.Make(handlers.HandleRoot))
-	mux.HandleFunc("GET /api/logs", shared.Make(h.HandleLogsSearch))
-	mux.HandleFunc("/index", shared.Make(h.HandleIndex))
+
+	// Routes
+	mux.HandleFunc("/", shared.Make(handler.HandleIndex))
+	mux.HandleFunc("GET /api/logs/partial", shared.Make(handler.HandleLogsPartial))
 
 	// Start server
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	logger.Info("HTTP server started", "listenAddr", listenAddr)
-	http.ListenAndServe(listenAddr, mux)
+	if err := http.ListenAndServe(listenAddr, mux); err != nil {
+		logger.Error("server error", "error", err)
+		os.Exit(1)
+	}
 }
 
 /*

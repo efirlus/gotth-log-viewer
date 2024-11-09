@@ -3,7 +3,9 @@ package services
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"gotthlogviewer/internal/types"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -11,16 +13,65 @@ import (
 )
 
 type LogService struct {
-	filepath string
-	cache    []types.LogEntry
-	lastRead time.Time
-	mu       sync.RWMutex
+	filepath    string
+	cache       []types.LogEntry
+	lastRead    time.Time
+	lastModTime time.Time
+	mu          sync.RWMutex
+	onChange    func([]types.LogEntry)
 }
 
 func NewLogService(filepath string) *LogService {
-	return &LogService{
+	ls := &LogService{
 		filepath: filepath,
 	}
+
+	go ls.watch()
+
+	return ls
+}
+
+func (ls *LogService) watch() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	ls.lastModTime = time.Now() // Initialize with current time
+
+	for range ticker.C {
+		slog.Info("checking for log changes")
+
+		stat, err := os.Stat(ls.filepath)
+		if err != nil {
+			slog.Error("failed to stat log file", "error", err)
+			continue
+		}
+
+		// Check if file has been modified
+		if stat.ModTime().After(ls.lastModTime) {
+			slog.Info("detected log file changes",
+				"lastMod", ls.lastModTime,
+				"newMod", stat.ModTime())
+
+			// Update timestamp first to avoid missing updates
+			ls.lastModTime = stat.ModTime()
+
+			// Read new logs
+			logs, err := ls.ReadLogs()
+			if err != nil {
+				slog.Error("failed to read logs", "error", err)
+				continue
+			}
+
+			if ls.onChange != nil {
+				slog.Info("broadcasting log updates", "logCount", len(logs))
+				ls.onChange(logs)
+			}
+		}
+	}
+}
+
+func (ls *LogService) SetOnChange(fn func([]types.LogEntry)) {
+	ls.onChange = fn
 }
 
 // getStringValue tries multiple field names and returns the first non-empty value
@@ -140,6 +191,7 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
 		logs := ls.cache
 		ls.mu.RUnlock()
+		slog.Debug("returning cached logs", "count", len(logs))
 		return logs, nil
 	}
 	ls.mu.RUnlock()
@@ -149,12 +201,14 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 
 	// Double-check cache after getting write lock
 	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
+		slog.Debug("returning cached logs after double-check", "count", len(ls.cache))
 		return ls.cache, nil
 	}
 
+	slog.Info("reading logs from file")
 	file, err := os.Open(ls.filepath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 	defer file.Close()
 
@@ -171,12 +225,13 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error scanning log file: %w", err)
 	}
 
 	ls.cache = logs
 	ls.lastRead = time.Now()
 
+	slog.Info("read new logs from file", "count", len(logs))
 	return logs, nil
 }
 

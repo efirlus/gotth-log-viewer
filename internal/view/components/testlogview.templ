@@ -2,101 +2,128 @@ package components
 
 import (
     "gotthlogviewer/internal/types"
-    "strings"
-	"slices"
+    ft "gotthlogviewer/internal/filters"
 )
 
-templ LogViewer(logs []types.LogEntry, filters ViewFilters) {
+templ searchInput(value string) {
+    <div class="flex-1 relative">
+        // Icon positioned inside the search bar
+        <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtext opacity-50"
+        >
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+        </svg>
+
+        // Search input matching dropdown height
+        <input 
+            type="text"
+            name="search"
+            placeholder="Search logs..."
+            value={ value }
+            hx-trigger="input delay:300ms, change"
+            class="w-full h-10 pl-11 pr-4 bg-surface0 text-text placeholder:text-subtext rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-yellow font-fira"
+        />
+    </div>
+}
+
+templ programButtons(logs []types.LogEntry, filters types.LogFilters) {
+    <div class={
+        "bg-mantle flex flex-wrap gap-2 rounded-b-lg border-x border-b border-opacity-10 border-surface0",
+        "px-4 pb-[16px]", // Separate padding classes
+        "mb-6"
+    }>
+        // Debug output to verify filter value
+        <div class="hidden">Debug programButtons: Current Program Filter = { filters.Program }</div>
+        // "All Programs" button
+        <button
+            type="button"
+            onclick={ setProgramFilter("") }
+            class={
+                "px-2 py-0.5 text-sm font-medium transition-colors rounded-lg border border-surface1",
+                // Simplified active/inactive states for debugging
+                templ.KV("bg-yellow text-crust", filters.Program == ""),
+                templ.KV("bg-surface0 text-text", filters.Program != "")
+            }
+        >
+            All Programs
+        </button>
+
+        if programs := ft.GetUniquePrograms(logs); len(programs) > 0 {
+            for _, program := range programs {
+                // Debug output for each button
+                <div class="hidden">Comparing: [{ program }] with [{ filters.Program }]</div>
+                <button
+                    type="button"
+                    onclick={ setProgramFilter(program) }
+                    class={
+                        "px-2 py-0.5 text-sm font-medium transition-colors rounded-lg border border-surface1",
+                        // Simplified active/inactive states for debugging
+                        templ.KV("bg-yellow text-crust", program == filters.Program),
+                        templ.KV("bg-surface0 text-text", program != filters.Program)                    }
+                >
+                    { program }
+                </button>
+            }
+        }
+    </div>
+}
+
+templ LogViewer(logs []types.LogEntry, filters types.LogFilters) {
     @Layout() {
-        <div class="min-h-screen bg-base p-6">
+        <div id="main-content" class="min-h-screen bg-base p-6">
             <div class="max-w-7xl mx-auto">
                 <div class="mb-8">
-                    <h1 class="text-3xl font-bold text-text mb-4">Log Viewer</h1>
+                    <h1 class="text-3xl font-bold text-text font-fira mb-4">Log Viewer</h1>
                     
-                    // Filter bar with nice styling
-                    <div class="bg-mantle rounded-lg shadow-lg p-4 mb-6 border border-surface0">
-                        <div class="flex items-center gap-4">
-                            // Search box with icon
-                            <div class="flex-1 relative">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-subtext">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="11" cy="11" r="8"></circle>
-                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                    </svg>
-                                </span>
-                                <input 
-                                    type="text"
-                                    name="search"
-                                    placeholder="Search logs..."
-                                    value={filters.Search}
-                                    class="w-full pl-10 pr-4 py-2 bg-crust text-text border border-surface0 rounded-lg focus:ring-2 focus:ring-blue focus:border-transparent"
-                                    hx-get="/api/logs"
-                                    hx-trigger="input changed delay:300ms"
-                                    hx-target="#log-container"
-                                    hx-include="[name='level'], [name='program']"
-                                />
-                            </div>
+                    <div class={
+                        "bg-mantle rounded-t-lg shadow-md border border-opacity-10 border-surface0",
+                        "px-4 pt-[16px] pb-[8px]", // Separate padding classes for clarity
+                        "mb-0"
+                    }>
+                        <form id="filters-form" 
+                            hx-get="/api/logs/partial"
+                            hx-target="#log-entries"
+                            class="space-y-2 font-fira">
                             
-                            // Level filter dropdown
-                            <select
-                                name="level"
-                                class="px-4 py-2 bg-crust text-text border border-surface0 rounded-lg focus:ring-2 focus:ring-blue"
-                                hx-get="/api/logs"
-                                hx-trigger="change"
-                                hx-target="#log-container"
-                                hx-include="[name='search'], [name='program']"
-                            >
-                                <option value="" selected?={ filters.Level == "" }>All Levels</option>
-                                <option value="error" selected?={ filters.Level == "error" }>Error</option>
-                                <option value="warn" selected?={ filters.Level == "warn" }>Warning</option>
-                                <option value="info" selected?={ filters.Level == "info" }>Info</option>
-                                <option value="debug" selected?={ filters.Level == "debug" }>Debug</option>
-                            </select>
-                        </div>
+                            <div class="flex items-center gap-4 mb-3">
+                                // Search input
+                                @searchInput(filters.Search)
 
-                        <div class="flex flex-wrap gap-2">
-                            <button 
-                                class={
-                                    "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                                    "border border-surface1",
-                                    templ.KV("bg-lavender text-crust", filters.Program == ""),
-                                    templ.KV("bg-surface0 text-text hover:bg-surface1", filters.Program != "")
-                                }
-                                hx-get="/api/logs"
-                                hx-trigger="click"
-                                hx-target="#log-container"
-                                hx-include="[name='search'], [name='level']"
-                                name="program"
-                                value=""
-                            >
-                                All Programs
-                            </button>
-                            
-                            for _, program := range getUniquePrograms(logs) {
-                                <button
-                                    class={
-                                        "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                                        "border border-surface1",
-                                        templ.KV("bg-lavender text-crust", filters.Program == program),
-                                        templ.KV("bg-surface0 text-text hover:bg-surface1", filters.Program != program)
-                                    }
-                                    hx-get="/api/logs"
-                                    hx-trigger="click"
-                                    hx-target="#log-container"
-                                    hx-include="[name='search'], [name='level']"
-                                    name="program"
-                                    value={ program }
+                                // Level select
+                                <select
+                                    name="level"
+                                    hx-trigger="change"
+                                    class="h-10 px-4 py-2 bg-crust text-text border border-opacity-10 border-surface0 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow"
                                 >
-                                    { program }
-                                </button>
-                            }
-                        </div>
+                                    <option value="">All Levels</option>
+                                    <option value="error" selected?={ filters.Level == "error" }>Error</option>
+                                    <option value="warn" selected?={ filters.Level == "warn" }>Warning</option>
+                                    <option value="info" selected?={ filters.Level == "info" }>Info</option>
+                                    <option value="debug" selected?={ filters.Level == "debug" }>Debug</option>
+                                </select>
+                            </div>
 
-
+                            // Hidden program input
+                            <input type="hidden" id="program-filter" name="program" value={ filters.Program }/>
+                        </form>
                     </div>
 
-                    // Log entries
-                    <div id="log-container">
+                    // Log entries with polling
+                    <div 
+                        id="log-entries"
+                        hx-get="/api/logs/partial"
+                        hx-trigger="every 2s"
+                        hx-include="#filters-form"
+                        class="space-y-4"
+                    >
                         @LogList(logs, filters)
                     </div>
                 </div>
@@ -105,39 +132,35 @@ templ LogViewer(logs []types.LogEntry, filters ViewFilters) {
     }
 }
 
-func sortLogs(logs []types.LogEntry) []types.LogEntry {
-    sorted := make([]types.LogEntry, len(logs))
-    copy(sorted, logs)
-
-    slices.SortFunc(sorted, func(a, b types.LogEntry) int {
-        switch {
-            case a.Timestamp > b.Timestamp: return -1
-            case a.Timestamp < b.Timestamp: return 1
-            default: return 0
-        }
-    })
-
-    return sorted
+script setProgramFilter(program string) {
+    const input = document.getElementById('program-filter');
+    console.log('Setting program filter to:', program);
+    input.value = program;
+    
+    // Create and dispatch events
+    const changeEvent = new Event('change', { bubbles: true });
+    input.dispatchEvent(changeEvent);
 }
 
-// ------------ filter -------------- //`
-
-type ViewFilters struct {
-    Search string
-    Level string
-    Program string
-}
-
-templ LogList(logs []types.LogEntry, filters ViewFilters) {
-    for _, log := range sortLogs(FilterLogs(logs, filters)) {
+templ LogList(logs []types.LogEntry, filters types.LogFilters) {
+    <div
+        id="log-content"
+        data-program-filter="{ filters.Program }"
+        data-level-filter="{ filters.Level }"
+        data-search-filter="{ filters.Search }"
+    >
+        @programButtons(logs, filters)
+    
+    
+    for _, log := range ft.SortLogs(ft.ApplyFilters(logs, filters)) {
         <div class="bg-surface0 rounded mb-2 p-2">
-            <div class="flex gap-2 items-center">
+            <div class="flex gap-2 items-center font-fira">
                 <span class="text-subtext text-sm">{ log.Timestamp }</span>
                 <span class={
                     "px-2 py-0.5 rounded text-crust text-sm",
                     templ.KV("bg-red", log.Level == "error"),
                     templ.KV("bg-peach", log.Level == "warn"),
-                    templ.KV("bg-blue", log.Level == "info"),
+                    templ.KV("bg-yellow", log.Level == "info"),
                     templ.KV("bg-surface1 text-text", log.Level == "debug"),
                 }>{ log.Level }</span>
                 if log.Program != "" {
@@ -145,50 +168,12 @@ templ LogList(logs []types.LogEntry, filters ViewFilters) {
                 }
             </div>
             <div class="mt-2 border-l-2 border-surface1 pl-2">
-                <pre class="whitespace-pre-wrap break-words text-text">{ log.Message }</pre>
+                <pre class="whitespace-pre-wrap break-words text-text font-cjk">{ log.Message }</pre>
                 if log.Location != nil {
-                    <div class="text-subtext text-sm mt-1">{ *log.Location }</div>
+                    <div class="text-subtext text-sm mt-1 font-fira">{ *log.Location }</div>
                 }
             </div>
         </div>
     }
-}
-
-func FilterLogs(logs []types.LogEntry, filters ViewFilters) []types.LogEntry {
-    filtered := logs
-
-    if filters.Search != "" {
-        search := strings.ToLower(filters.Search)
-        filtered =  slices.DeleteFunc(slices.Clone(logs), func(log types.LogEntry) bool {
-            return !strings.Contains(strings.ToLower(log.Message), search) &&
-                !strings.Contains(strings.ToLower(log.Program), search) &&
-                !strings.Contains(strings.ToLower(log.Level), search)
-        })
-    }
-
-    if filters.Level != "" {
-        filtered = slices.DeleteFunc(slices.Clone(logs), func(log types.LogEntry) bool {
-            return log.Level != filters.Level
-        })
-    }
-
-    return filtered
-}
-
-// Helper function to get unique program names from logs
-func getUniquePrograms(logs []types.LogEntry) []string {
-    programMap := make(map[string]bool)
-    for _, log := range logs {
-        if log.Program != "" {
-            programMap[log.Program] = true
-        }
-    }
-
-    // Convert to sorted slice
-    programs := make([]string, 0, len(programMap))
-    for program := range programMap {
-        programs = append(programs, program)
-    }
-    slices.Sort(programs)
-    return programs
+    </div>
 }

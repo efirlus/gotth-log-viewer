@@ -1,0 +1,44 @@
+<div class=\"flex-1 relative\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtext opacity-50\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle> <path d=\"m21 21-4.3-4.3\"></path></svg><input type=\"text\" name=\"search\" placeholder=\"Search logs...\" value=\"
+\" hx-trigger=\"input delay:300ms, change\" class=\"w-full h-10 pl-11 pr-4 bg-surface0 text-text placeholder:text-subtext rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-yellow font-fira\"></div>
+<div class=\"
+\"><div class=\"hidden\">Debug programButtons: Current Program Filter = 
+</div>
+<button type=\"button\" onclick=\"
+\" class=\"
+\">All Programs</button> 
+ <div class=\"hidden\">Comparing: [
+] with [
+]</div>
+<button type=\"button\" onclick=\"
+\" class=\"
+\">
+</button>
+</div>
+<div id=\"main-content\" class=\"min-h-screen bg-base p-6\"><div class=\"max-w-7xl mx-auto\"><div class=\"mb-8\"><h1 class=\"text-3xl font-bold text-text font-fira mb-4\">Log Viewer</h1>
+<div class=\"
+\"><form id=\"filters-form\" hx-get=\"/api/logs/partial\" hx-target=\"#log-entries\" class=\"space-y-2 font-fira\"><div class=\"flex items-center gap-4 mb-3\">
+<select name=\"level\" hx-trigger=\"change\" class=\"h-10 px-4 py-2 bg-crust text-text border border-opacity-10 border-surface0 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow\"><option value=\"\">All Levels</option> <option value=\"error\"
+ selected
+>Error</option> <option value=\"warn\"
+ selected
+>Warning</option> <option value=\"info\"
+ selected
+>Info</option> <option value=\"debug\"
+ selected
+>Debug</option></select></div><input type=\"hidden\" id=\"program-filter\" name=\"program\" value=\"
+\"></form></div><div id=\"log-entries\" hx-get=\"/api/logs/partial\" hx-trigger=\"every 2s\" hx-include=\"#filters-form\" class=\"space-y-4\">
+</div></div></div></div>
+<div id=\"log-content\" data-program-filter=\"{ filters.Program }\" data-level-filter=\"{ filters.Level }\" data-search-filter=\"{ filters.Search }\">
+<div class=\"bg-surface0 rounded mb-2 p-2\"><div class=\"flex gap-2 items-center font-fira\"><span class=\"text-subtext text-sm\">
+</span> 
+<span class=\"
+\">
+</span> 
+<span class=\"bg-lavender text-crust px-2 py-0.5 rounded text-sm\">
+</span>
+</div><div class=\"mt-2 border-l-2 border-surface1 pl-2\"><pre class=\"whitespace-pre-wrap break-words text-text font-cjk\">
+</pre>
+<div class=\"text-subtext text-sm mt-1 font-fira\">
+</div>
+</div></div>
+</div>

@@ -21,3 +21,6 @@ clean:
 	rm -rf tmp/
 	rm -f static/css/styles.css
 	find . -name "*_templ.go" -type f -delete
+
+css-once:
+	tailwindcss -i ./internal/view/css/app.css -o ./static/css/styles.css --minify
