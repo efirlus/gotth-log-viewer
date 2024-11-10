@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	lg "gotthlogviewer/cmd/logger"
 	"gotthlogviewer/internal/types"
-	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -38,19 +38,19 @@ func (ls *LogService) watch() {
 	ls.lastModTime = time.Now() // Initialize with current time
 
 	for range ticker.C {
-		slog.Info("checking for log changes")
+		lg.Debug("checking for log changes")
 
 		stat, err := os.Stat(ls.filepath)
 		if err != nil {
-			slog.Error("failed to stat log file", "error", err)
+			lg.Error("failed to stat log file", err)
 			continue
 		}
 
 		// Check if file has been modified
 		if stat.ModTime().After(ls.lastModTime) {
-			slog.Info("detected log file changes",
-				"lastMod", ls.lastModTime,
-				"newMod", stat.ModTime())
+			lg.Debug(fmt.Sprintln("detected log file changes ",
+				"lastMod ", ls.lastModTime,
+				"newMod ", stat.ModTime()))
 
 			// Update timestamp first to avoid missing updates
 			ls.lastModTime = stat.ModTime()
@@ -58,12 +58,12 @@ func (ls *LogService) watch() {
 			// Read new logs
 			logs, err := ls.ReadLogs()
 			if err != nil {
-				slog.Error("failed to read logs", "error", err)
+				lg.Error("failed to read logs", err)
 				continue
 			}
 
 			if ls.onChange != nil {
-				slog.Info("broadcasting log updates", "logCount", len(logs))
+				lg.Debug(fmt.Sprintln("broadcasting log updates ", "logCount:", len(logs)))
 				ls.onChange(logs)
 			}
 		}
@@ -191,7 +191,7 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
 		logs := ls.cache
 		ls.mu.RUnlock()
-		slog.Debug("returning cached logs", "count", len(logs))
+		lg.Debug(fmt.Sprintln("returning cached logs ", "count:", len(logs)))
 		return logs, nil
 	}
 	ls.mu.RUnlock()
@@ -201,11 +201,11 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 
 	// Double-check cache after getting write lock
 	if ls.cache != nil && time.Since(ls.lastRead) < 5*time.Second {
-		slog.Debug("returning cached logs after double-check", "count", len(ls.cache))
+		lg.Debug(fmt.Sprintln("returning cached logs after double-check ", "count:", len(ls.cache)))
 		return ls.cache, nil
 	}
 
-	slog.Info("reading logs from file")
+	lg.Debug("reading logs from file")
 	file, err := os.Open(ls.filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
@@ -231,149 +231,6 @@ func (ls *LogService) ReadLogs() ([]types.LogEntry, error) {
 	ls.cache = logs
 	ls.lastRead = time.Now()
 
-	slog.Info("read new logs from file", "count", len(logs))
+	lg.Debug(fmt.Sprintln("read new logs from file ", "count:", len(logs)))
 	return logs, nil
 }
-
-/*
-type LogService interface {
-	FetchLogs(filters model.LogFilters) ([]model.LogEntry, error)
-	GetUniquePrograms() ([]string, error)
-}
-
-// Implementation will handle:
-// - Reading log file
-// - Parsing logs
-// - Filtering
-// - Timestamp tracking
-type logService struct {
-    logPath string
-    cache   *logCache  // Optionally cache parsed logs
-}
-
-func (s *logService) FetchLogs(filters model.LogFilters) ([]model.LogEntry, error) {
-    rawLogs := s.readLogFile()
-    parsedLogs := s.parseLogs(rawLogs)
-    return s.applyFilters(parsedLogs, filters), nil
-}
-
-var lastTimestamp *string = nil
-var logFilePath = "/home/efirlus/goproject/Logs/app.log"
-var logMutex sync.Mutex
-
-func fetchLogs() ([]model.LogEntry, error) {
-	baseURL := "/api/logs"
-	var apiUrl string
-
-	if lastTimestamp != nil {
-		apiUrl = fmt.Sprintf("%s?since=%s", baseURL, url.QueryEscape(*lastTimestamp))
-	} else {
-		apiUrl = baseURL
-	}
-
-	resp, err := http.Get(apiUrl)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching logs: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP error! status: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	var data []map[string]interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %w", err)
-	}
-
-	var logs []model.LogEntry
-	for _, log := range data {
-		timestamp := getStringValue(log, "time", "timestamp", time.Now().Format(time.RFC3339))
-		level := strings.ToLower(getStringValue(log, "loglevel", "level", "severity", "info"))
-		program := getStringValue(log, "programname", "program", "service", "unknown")
-		message := getStringValue(log, "message", "msg", "text", "logstring")
-		location := getStringPointerValue(log, "location")
-
-		logEntry := model.LogEntry{
-			Timestamp: timestamp,
-			Level:     level,
-			Program:   program,
-			Message:   message,
-			Location:  location,
-			Raw:       log, // Store the original log entry for debugging
-		}
-		logs = append(logs, logEntry)
-	}
-
-	if len(logs) > 0 {
-		lastTimestamp = &logs[len(logs)-1].Timestamp
-	}
-
-	return logs, nil
-}
-
-func resetLastTimestamp() {
-	lastTimestamp = nil
-}
-
-func getStringValue(data map[string]interface{}, keys ...string) string {
-	for _, key := range keys {
-		if val, ok := data[key]; ok {
-			if strVal, valid := val.(string); valid {
-				return strVal
-			}
-		}
-	}
-	return ""
-}
-
-func getStringPointerValue(data map[string]interface{}, keys ...string) *string {
-	for _, key := range keys {
-		if val, ok := data[key]; ok {
-			if strVal, valid := val.(string); valid {
-				return &strVal
-			}
-		}
-	}
-	return nil
-}
-
-// -------------  로그를 파일에서 읽는 부분 까지 --------------------- //
-
-// SSEClient holds the channel for sending events
-type SSEClient struct {
-	channel chan []model.LogEntry
-}
-
-var clients = make(map[*SSEClient]bool)
-var clientsMutex sync.Mutex
-
-// addClient registers an SSE client
-func addClient(client *SSEClient) {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
-	clients[client] = true
-}
-
-// removeClient unregisters an SSE client
-func removeClient(client *SSEClient) {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
-	delete(clients, client)
-	close(client.channel)
-}
-
-// broadcastLogs sends new log entries to all SSE clients
-func broadcastLogs(entries []model.LogEntry) {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
-	for client := range clients {
-		client.channel <- entries
-	}
-}
-*/

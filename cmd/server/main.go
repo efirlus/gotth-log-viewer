@@ -1,11 +1,12 @@
 package main
 
 import (
+	"fmt"
+	lg "gotthlogviewer/cmd/logger"
 	"gotthlogviewer/internal/handlers"
 	"gotthlogviewer/internal/services"
 	"gotthlogviewer/internal/shared"
 
-	"log/slog"
 	"net/http"
 	"os"
 
@@ -13,16 +14,16 @@ import (
 )
 
 func main() {
-	// Initialize structured logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	// environmental variable get
+	loadEnvironment()
 
-	if err := godotenv.Load(); err != nil {
-		logger.Error("error loading .env file", "error", err)
+	// Initialize structured logging
+	if err := lg.Initialize(os.Getenv("LOG_PATH"), "gotth-log-viewer"); err != nil {
+		os.Stderr.WriteString("Failed to initialize logger: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
-	logService := services.NewLogService("test.app.log")
+	logService := services.NewLogService(os.Getenv("LOG_PATH"))
 	handler := handlers.NewLogHandler(logService)
 
 	// Create a new ServeMux
@@ -37,42 +38,25 @@ func main() {
 
 	// Start server
 	listenAddr := os.Getenv("LISTEN_ADDR")
-	logger.Info("HTTP server started", "listenAddr", listenAddr)
+	lg.Info(fmt.Sprintf("HTTP server started at port %v", listenAddr))
 	if err := http.ListenAndServe(listenAddr, mux); err != nil {
-		logger.Error("server error", "error", err)
+		lg.Error("server error", err)
 		os.Exit(1)
 	}
 }
 
-/*
-type LogEntry struct {
-	Timestamp string `json:"timestamp"`
-	Level     string `json:"level"`
-	Message   string `json:"message"`
-	Program   string `json:"program"`
-	Location  string `json:"location,omitempty"`
+func loadEnvironment() {
+	// Try to load .env file, but don't error if it doesn't exist
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found, using environment variables")
+	}
+
+	// Validate required environment variables
+	required := []string{"LISTEN_ADDR", "LOG_PATH"}
+	for _, env := range required {
+		if os.Getenv(env) == "" {
+			fmt.Println("required environment variable not set - no environment variable found")
+			os.Exit(1)
+		}
+	}
 }
-	// Static files
-	mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
-
-	// API routes
-	mux.HandleFunc("GET /api/logs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		// TODO: Implement log reading logic
-	})
-
-	// SSE endpoint for real-time updates
-	mux.HandleFunc("GET /api/logs/stream", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		// TODO: Implement streaming logic
-	})
-
-	// Main page
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement templ component rendering
-		// component := views.LogViewerPage()
-		// component.Render(r.Context(), w)
-	})
-*/

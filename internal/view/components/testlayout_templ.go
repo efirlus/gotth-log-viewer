@@ -41,7 +41,7 @@ func TestLayout() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"bg-base text-text min-h-screen\"><div class=\"p-4 bg-surface0 border border-surface1 text-lavender rounded-lg m-4\"><h1 class=\"text-xl\">Hello GoTTH Project</h1></div><div class=\"space-y-2 p-4\"><div class=\"bg-red text-crust p-2 rounded\">Error Message</div><div class=\"bg-peach text-crust p-2 rounded\">Warn Message</div><div class=\"bg-yellow text-crust p-2 rounded\">Info Message</div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
