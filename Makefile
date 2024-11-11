@@ -10,7 +10,11 @@ air:
 
 # Run templ with proxy to our air server
 templ:
-	templ generate --watch --proxy=http://localhost:5174 --open-browser=false
+	templ generate --watch \
+	    --proxy=https://0.0.0.0:5173 \
+		--proxybind="0.0.0.0" \
+		--proxyport=7332 \
+		--open-browser=false
 
 # Watch and compile CSS with Tailwind
 css:
