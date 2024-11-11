@@ -1,5 +1,6 @@
 # GoTTH Log Viewer
 
+![Sample Sreenshot.png](https://github.com/efirlus/gotth-log-viewer/blob/61f6bafe7cb06f340a22ecae1fc3a771d2bdc66d/Sample%20Sreenshot.png?raw=true)
 A service-oriented log viewer built with Go, Templ, Tailwind, and HTMX (GoTTH stack). This project demonstrates the transformation of a React-based SPA into a server-side rendered application with real-time updates.
 
 ## Features
