@@ -1,0 +1,54 @@
+package auth
+
+import "gotthlogviewer/internal/view/components"
+
+templ LoginPage() {
+	@components.Layout() {
+		<div class="min-h-screen bg-base flex items-center justify-center">
+			<div class="max-w-md w-full space-y-8 p-8 bg-surface0 rounded-lg shadow-lg">
+				<div class="text-center">
+					<h2 class="text-3xl font-bold text-text">Sign in</h2>
+				</div>
+				<form 
+					class="mt-8 space-y-6" 
+					hx-post="/auth/login"
+					hx-swap="outerHTML"
+					hx-trigger="submit"
+				>
+					<div class="rounded-md shadow-sm -space-y-px">
+						<div>
+							<label for="username" class="sr-only">Username</label>
+							<input 
+								id="username" 
+								name="username" 
+								type="text" 
+								required
+								class="appearance-none rounded-none relative block w-full px-3 py-2 border border-surface1 placeholder-subtext text-text rounded-t-md focus:outline-none focus:ring-yellow focus:border-yellow focus:z-10 sm:text-sm"
+								placeholder="Username"
+							/>
+						</div>
+						<div>
+							<label for="passphrase" class="sr-only">Passphrase</label>
+							<input 
+								id="passphrase" 
+								name="passphrase" 
+								type="password" 
+								required
+								class="appearance-none rounded-none relative block w-full px-3 py-2 border border-surface1 placeholder-subtext text-text rounded-b-md focus:outline-none focus:ring-yellow focus:border-yellow focus:z-10 sm:text-sm"
+								placeholder="Passphrase"
+							/>
+						</div>
+					</div>
+					<div>
+						<button 
+							type="submit"
+							class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-crust bg-yellow hover:bg-peach focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow"
+						>
+							Sign in
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
